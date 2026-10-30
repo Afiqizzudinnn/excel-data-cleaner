@@ -4,155 +4,274 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Excel Data Cleaner</title>
-<meta name="description" content="Clean a messy Excel or CSV export in one click: extra spaces, empty rows, duplicates, mixed dates and numbers stored as text.">
+<meta name="description" content="Fix a messy Excel or CSV export: extra spaces, empty rows, duplicates, mixed dates and numbers stored as text. Every change is logged.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cal+Sans&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
+  /* Cal.com style: monochrome, one blue accent, pill buttons, soft cards on paper. */
   :root {
-    --bg: #f5f7fa; --surface: #ffffff; --surface-2: #f0f3f7; --text: #152232; --muted: #5d6b7b; --border: #dfe4ea;
-    --primary: #1f3a5f; --primary-ink: #ffffff; --primary-soft: #e7eef7;
-    --good: #0e7a55; --good-soft: #e3f3ec; --warn: #a15c07; --warn-soft: #fdf1df; --changed: #fff1b8;
-    --radius: 12px; --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 16px rgba(16,24,40,.06);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0e131a; --surface: #151c25; --surface-2: #1b2430; --text: #e5eaf0; --muted: #98a5b4; --border: #27323f;
-      --primary: #9dbce3; --primary-ink: #0e131a; --primary-soft: #1d2a3a;
-      --good: #53c79a; --good-soft: #15302a; --warn: #e7a54a; --warn-soft: #33270f; --changed: #4b3f10; --shadow: none;
-    }
+    --ink: #101010; --graphite: #242424; --slate: #6b7280; --stone: #898989; --silver: #e5e7eb;
+    --paper: #f4f4f4; --white: #ffffff; --blue: #0099ff; --info: #eff6fe; --line: #e2e2e2; --mark: #c4c4c4;
+    --sh-card: rgba(36,36,36,.05) 0 4px 8px 0;
+    --sh-hover: rgba(36,36,36,.7) 0 1px 5px -4px, rgba(36,36,36,.05) 0 4px 8px 0;
+    --sh-ring: rgba(19,19,22,.7) 0 1px 5px -4px, rgba(34,42,53,.08) 0 0 0 1px, rgba(34,42,53,.05) 0 4px 8px 0;
+    --sh-chip: rgba(0,0,0,.1) 0 1px 3px 0, rgba(0,0,0,.06) 0 0 2px 0;
+    --sh-press: rgba(255,255,255,.15) 0 2px 0 0 inset;
+    --display: "Cal Sans", Poppins, ui-sans-serif, system-ui, sans-serif;
+    --ui: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; font-size: 15px; }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
-  header.top { border-bottom: 1px solid var(--border); background: var(--surface); }
-  .top .wrap { display: flex; align-items: center; justify-content: space-between; min-height: 56px; gap: 12px; flex-wrap: wrap; }
-  .brand { font-weight: 700; color: var(--text); text-decoration: none; font-size: 14px; }
-  .brand span { color: var(--muted); font-weight: 500; }
-  nav.tools { display: flex; gap: 4px; flex-wrap: wrap; }
-  nav.tools a { font-size: 13px; color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 8px; }
-  nav.tools a:hover { color: var(--text); }
-  nav.tools a[aria-current] { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
-  .hero { padding: 40px 0 24px; }
-  .hero h1 { font-size: 32px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -.5px; }
-  .hero p { margin: 0; color: var(--muted); font-size: 17px; max-width: 660px; }
-  .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
-  .badge { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 16px; }
-  .step { font-size: 12px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--primary); margin-bottom: 4px; }
-  .card h2 { font-size: 18px; margin: 0 0 14px; }
-  .drop { border: 2px dashed var(--border); border-radius: var(--radius); padding: 28px 16px; text-align: center; cursor: pointer; background: var(--surface-2); transition: .15s; }
-  .drop:hover, .drop.over, .drop:focus { border-color: var(--primary); background: var(--primary-soft); outline: none; }
-  .drop b { display: block; font-size: 16px; }
-  .btn { font: inherit; font-weight: 600; font-size: 14px; border-radius: 8px; padding: 10px 16px; border: 1px solid transparent; cursor: pointer; }
-  .btn.primary { background: var(--primary); color: var(--primary-ink); }
-  .btn.ghost { background: transparent; border-color: var(--border); color: var(--text); }
-  .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .link { font: inherit; background: none; border: 0; padding: 0; color: var(--primary); font-weight: 600; cursor: pointer; text-decoration: underline; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
-  .stat { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; }
-  .stat .n { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
-  .stat .l { font-size: 13px; color: var(--muted); }
-  .muted { color: var(--muted); }
-  .notice { background: var(--warn-soft); color: var(--warn); padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-top: 12px; }
-  .table-wrap { overflow: auto; max-height: 440px; border: 1px solid var(--border); border-radius: 10px; }
-  table { border-collapse: collapse; width: 100%; font-size: 13px; }
-  th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
-  th { position: sticky; top: 0; background: var(--surface-2); font-weight: 600; z-index: 1; }
-  td.changed { background: var(--changed); }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  footer { padding: 32px 0 48px; color: var(--muted); font-size: 13px; }
-  footer a { color: var(--primary); }
+  [hidden] { display: none !important; }
+  html { color-scheme: light; }
+  body { margin: 0; background: var(--paper); color: var(--graphite); font: 300 16px/1.5 var(--ui); letter-spacing: -0.19px; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  button, input, select { font: inherit; letter-spacing: inherit; color: inherit; }
+  h1, h2, h3 { font-family: var(--display); font-weight: 400; color: var(--graphite); margin: 0; }
+  b { font-weight: 500; color: var(--graphite); }
+  code { font: 400 12px/1.4 var(--mono); letter-spacing: 0; background: var(--paper); padding: 1px 5px; border-radius: 4px; }
+  .chev { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
-  .loaded { margin-top: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 14px; }
-  select { font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
-  .opts { display: grid; gap: 10px; margin-bottom: 18px; }
-  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
-  .opt input { margin-top: 4px; accent-color: var(--primary); }
-  .opt b { display: block; font-size: 14px; }
-  .opt span { font-size: 13px; color: var(--muted); }
-  .opt code { font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
-  .opt select { margin-top: 6px; font-size: 13px; padding: 4px 8px; }
-  .tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
-  .tab { font: inherit; font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
-  .tab[aria-selected="true"] { background: var(--primary-soft); color: var(--primary); border-color: transparent; }
-  .actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
-  .legend { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--changed); vertical-align: -1px; margin-right: 4px; }
+  /* Drafting frame: faint guide lines with a + where they cross */
+  .band { border-bottom: 1px solid var(--line); }
+  .frame { position: relative; width: min(1200px, 100% - 32px); margin: 0 auto; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  .frame::before, .frame::after { content: ""; position: absolute; bottom: -5px; width: 9px; height: 9px; z-index: 1;
+    background: linear-gradient(var(--mark), var(--mark)) center / 9px 1px no-repeat, linear-gradient(var(--mark), var(--mark)) center / 1px 9px no-repeat; }
+  .frame::before { left: -5px; }
+  .frame::after { right: -5px; }
+  .pad { padding: 24px; }
+  .section { padding: 96px 48px; }
+
+  /* Header */
+  .bar { display: flex; align-items: center; gap: 24px; min-height: 64px; padding: 0 24px; }
+  .wordmark { font-family: var(--display); font-size: 22px; letter-spacing: .2px; color: var(--ink); text-decoration: none; }
+  .nav { display: flex; gap: 2px; margin: 0 auto; }
+  .nav a { font-size: 14px; font-weight: 400; letter-spacing: -.2px; color: var(--slate); text-decoration: none; padding: 6px 10px; border-radius: 8px; white-space: nowrap; }
+  .nav a:hover { color: var(--graphite); }
+  .nav a[aria-current] { color: var(--ink); font-weight: 500; }
+  .btn-rect { display: inline-flex; align-items: center; gap: 4px; background: var(--ink); color: #fff; text-decoration: none; font-size: 14px; font-weight: 500; padding: 7px 10px 7px 14px; border-radius: 8px; box-shadow: var(--sh-press); }
+  .btn-rect:hover { background: #2a2a2a; }
+
+  /* Buttons and small controls */
+  .pill { display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 0; border-radius: 9999px; padding: 10px 20px; font-size: 14px; font-weight: 500; letter-spacing: -.2px; text-decoration: none; cursor: pointer; transition: background .15s, box-shadow .15s; }
+  .pill.ink { background: var(--ink); color: #fff; box-shadow: var(--sh-press); }
+  .pill.ink:hover { background: #2a2a2a; }
+  .pill.soft { background: var(--paper); color: var(--graphite); }
+  .pill.soft:hover { background: #ebebeb; }
+  .pill.white { background: #fff; color: var(--graphite); box-shadow: var(--sh-ring); }
+  .pill.wide { width: 100%; }
+  .pill:disabled { opacity: .35; cursor: not-allowed; }
+  .tag { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 400; letter-spacing: -.24px; color: var(--graphite); background: #fff; border-radius: 9999px; padding: 3px 8px 3px 10px; text-decoration: none; box-shadow: rgba(34,42,53,.1) 0 0 0 1px, rgba(34,42,53,.05) 0 2px 4px 0; }
+  .seg { display: inline-flex; gap: 2px; padding: 2px; background: var(--paper); border-radius: 8px; }
+  .seg > * { border: 0; background: transparent; border-radius: 6px; padding: 4px 10px; font-size: 13px; font-weight: 400; color: var(--slate); cursor: pointer; white-space: nowrap; }
+  .seg > [aria-checked="true"], .seg > [aria-selected="true"] { background: #fff; color: var(--ink); font-weight: 500; box-shadow: var(--sh-chip); }
+  .fine { font-size: 12px; letter-spacing: -.24px; color: var(--slate); }
+  .note { margin: 12px 0 0; font-size: 13.5px; background: var(--info); border-radius: 8px; padding: 10px 12px; box-shadow: inset 2px 0 0 var(--blue); }
+  select { background: #fff; border: 1px solid var(--silver); border-radius: 8px; padding: 6px 10px; font-size: 14px; font-weight: 400; }
+  select:focus { outline: none; border-color: var(--graphite); box-shadow: 0 0 0 3px rgba(16,16,16,.08); }
+
+  /* Hero */
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 56px; align-items: center; background: #fff; border-radius: 12px; box-shadow: var(--sh-card); padding: 56px; }
+  .hero h1 { font-size: clamp(40px, 5vw, 60px); line-height: 1.1; letter-spacing: .6px; margin: 20px 0 16px; }
+  .lede { color: var(--slate); max-width: 46ch; margin: 0; }
+  .cta { display: grid; gap: 8px; margin-top: 28px; max-width: 440px; }
+  .cta + .fine { margin: 12px 0 0; }
+
+  /* Widget: the tool itself, styled like Cal's booking card */
+  .widget { background: #fff; border-radius: 12px; box-shadow: var(--sh-ring); padding: 24px; transition: box-shadow .15s; }
+  .widget.over { box-shadow: 0 0 0 2px var(--ink), var(--sh-card); }
+  .w-head { display: flex; gap: 12px; align-items: center; }
+  .ico { width: 40px; height: 40px; border-radius: 9999px; background: var(--paper); display: grid; place-items: center; flex: none; }
+  .ico svg { width: 20px; height: 20px; fill: none; stroke: var(--graphite); stroke-width: 1.4; }
+  .w-kicker { font-size: 13px; color: var(--slate); letter-spacing: -.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .w-kicker.loaded { color: var(--graphite); font-weight: 500; }
+  .w-title { font-size: 20px; line-height: 1.3; letter-spacing: .2px; }
+  .w-desc { font-size: 14px; color: var(--slate); margin: 12px 0 16px; }
+  .w-field { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--slate); margin-bottom: 16px; }
+  .rules { margin: 0 -24px 20px; border-top: 1px solid var(--silver); }
+  .rule { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 24px; border-bottom: 1px solid var(--silver); cursor: pointer; }
+  .rule b { display: block; font-size: 14px; letter-spacing: -.2px; }
+  .rule small { display: block; font-size: 12.5px; color: var(--slate); letter-spacing: -.24px; }
+  .rule input { position: absolute; opacity: 0; pointer-events: none; }
+  .track { flex: none; position: relative; width: 32px; height: 18px; border-radius: 9999px; background: var(--silver); transition: background .15s; }
+  .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: var(--sh-chip); transition: transform .15s; }
+  .rule input:checked + .track { background: var(--ink); }
+  .rule input:checked + .track::after { transform: translateX(14px); }
+  .rule input:focus-visible + .track { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .rule.sub { cursor: default; padding-top: 8px; padding-bottom: 12px; }
+
+  /* Sections */
+  .h-lg { font-size: clamp(32px, 4vw, 48px); line-height: 1.1; letter-spacing: .48px; text-align: center; }
+  .sub { text-align: center; color: var(--slate); max-width: 600px; margin: 14px auto 0; }
+  .sub b { font-family: var(--display); font-weight: 400; letter-spacing: .2px; }
+  .actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
+  .panel { background: #fff; border-radius: 12px; box-shadow: var(--sh-card); margin-top: 40px; overflow: hidden; }
+  .panel-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 20px; border-bottom: 1px solid var(--silver); }
+  .table-wrap { overflow: auto; max-height: 460px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-weight: 400; letter-spacing: -.1px; }
+  th, td { padding: 9px 14px; border-bottom: 1px solid var(--silver); text-align: left; white-space: nowrap; }
+  th { position: sticky; top: 0; z-index: 1; background: #fafafa; font-weight: 500; font-size: 12.5px; color: var(--slate); }
+  tr:last-child td { border-bottom: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.changed { background: var(--info); }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--info); box-shadow: rgba(0,153,255,.45) 0 0 0 1px; margin-right: 6px; vertical-align: -1px; }
+  .empty-msg { padding: 20px; margin: 0; color: var(--slate); font-size: 14px; }
+
+  /* Feature cards with a small piece of UI at the bottom */
+  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 48px; }
+  .feat { background: #fff; border-radius: 12px; box-shadow: var(--sh-card); padding: 24px; display: flex; flex-direction: column; transition: box-shadow .15s; }
+  .feat:hover { box-shadow: var(--sh-hover); }
+  .num-tag { align-self: flex-start; font-size: 12px; color: var(--slate); background: var(--paper); border-radius: 6px; padding: 1px 7px; letter-spacing: -.24px; }
+  .feat h3 { font-size: 20px; line-height: 1.3; letter-spacing: .2px; margin: 16px 0 4px; }
+  .feat p { font-size: 15px; color: var(--slate); margin: 0; }
+  .mini { margin-top: auto; padding-top: 28px; }
+  .mini-rows { border-radius: 8px; box-shadow: rgba(34,42,53,.1) 0 0 0 1px; overflow: hidden; font-size: 12.5px; font-weight: 400; }
+  .mini-rows div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-bottom: 1px solid var(--silver); }
+  .mini-rows div:last-child { border-bottom: 0; }
+  .mini-rows span:first-child { color: var(--slate); }
+  .mini-rows span:last-child { font-family: var(--mono); font-size: 12px; letter-spacing: 0; }
+  .mini-line { margin-top: 10px; font-size: 13px; color: var(--slate); }
+
+  footer .bar { justify-content: space-between; flex-wrap: wrap; font-size: 13px; color: var(--slate); letter-spacing: -.2px; }
+  footer .bar a { color: var(--slate); text-decoration: none; margin-left: 16px; }
+  footer .bar a:hover { color: var(--ink); }
+
+  @media (max-width: 960px) {
+    .hero { grid-template-columns: 1fr; padding: 32px 24px; gap: 36px; }
+    .cards { grid-template-columns: 1fr; }
+    .section { padding: 64px 16px; }
+  }
+  @media (max-width: 720px) {
+    .bar { flex-wrap: wrap; gap: 8px 16px; padding: 12px 16px; }
+    .nav { order: 3; width: 100%; margin: 0 -10px; overflow-x: auto; }
+    .btn-rect { margin-left: auto; }
+    .pad { padding: 12px; }
+  }
 </style>
 </head>
 <body>
-<header class="top">
-  <div class="wrap">
-    <a class="brand" href="https://www.linkedin.com/in/afiq-izzudin-27aaa936b">Afiq Izzudin <span>/ Office Toolkit</span></a>
-    <nav class="tools" aria-label="Tools">
+<header class="band">
+  <div class="frame bar">
+    <a class="wordmark" href="https://www.linkedin.com/in/afiq-izzudin-27aaa936b">Afiq Izzudin</a>
+    <nav class="nav" aria-label="Office Toolkit">
       <a href="../excel-data-cleaner/" aria-current="page">Data Cleaner</a>
       <a href="../excel-report-merger/">Report Merger</a>
       <a href="../automation-roi-calculator/">ROI Calculator</a>
     </nav>
+    <a class="btn-rect" href="https://github.com/Afiqizzudinnn/excel-data-cleaner">View code <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></a>
   </div>
 </header>
 
-<main class="wrap">
-  <section class="hero">
-    <h1>Excel Data Cleaner</h1>
-    <p>Fix a messy Excel export in one click: extra spaces, empty rows, duplicates, mixed date formats and numbers stored as text. Every change is logged so you can check it.</p>
-    <div class="badges"><span class="badge">Free</span><span class="badge">No sign-up</span><span class="badge">Your file never leaves your computer</span></div>
+<main>
+  <section class="band">
+    <div class="frame pad">
+      <div class="hero">
+        <div>
+          <a class="tag" href="https://github.com/Afiqizzudinnn/excel-data-cleaner">Free and open source <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></a>
+          <h1>Fix a messy Excel export without retyping a cell</h1>
+          <p class="lede">Stray spaces, blank rows, the same claim entered twice, dates in five formats and “RM 1,250.00” stuck as text. Drop the file in, choose what to fix, and get a clean sheet with a log of every change.</p>
+          <div class="cta">
+            <button class="pill ink" id="sample">Try it with sample data</button>
+            <button class="pill soft" id="pick">Upload your own file <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>
+          </div>
+          <p class="fine">Runs in your browser. Your file is never uploaded.</p>
+          <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+        </div>
+
+        <div class="widget" id="drop">
+          <div class="w-head">
+            <span class="ico"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="3.5" width="13" height="13" rx="2"/><path d="M3.5 8h13M3.5 12h13M8 8v8.5"/></svg></span>
+            <div style="min-width:0">
+              <div class="w-kicker" id="fileName">No file yet</div>
+              <h2 class="w-title">Cleaning rules</h2>
+            </div>
+          </div>
+          <p class="w-desc">Drag an .xlsx, .xls or .csv file onto this card. Switch off anything you want left as it is.</p>
+          <div class="w-field" id="sheetRow" hidden>Sheet <select id="sheet"></select></div>
+          <div class="rules">
+            <label class="rule"><span><b>Remove extra spaces</b><small><code>"  Ali   Ahmad "</code> becomes <code>Ali Ahmad</code></small></span><input type="checkbox" id="oTrim" checked><span class="track"></span></label>
+            <label class="rule"><span><b>Remove empty rows</b><small>Rows with nothing in them are dropped</small></span><input type="checkbox" id="oEmpty" checked><span class="track"></span></label>
+            <label class="rule"><span><b>Remove duplicate rows</b><small>Checked after cleaning, the first copy is kept</small></span><input type="checkbox" id="oDupes" checked><span class="track"></span></label>
+            <label class="rule"><span><b>Turn text into real dates</b><small><code>3 Mar 2026</code> and <code>03/03/26</code> become <code>2026-03-03</code></small></span><input type="checkbox" id="oDates" checked><span class="track"></span></label>
+            <div class="rule sub"><small>Dates in my file are written</small>
+              <div class="seg" id="dayOrder" role="radiogroup" aria-label="Date order"><button type="button" role="radio" aria-checked="true" data-v="day">Day first</button><button type="button" role="radio" aria-checked="false" data-v="month">Month first</button></div>
+            </div>
+            <label class="rule"><span><b>Fix numbers stored as text</b><small><code>RM 1,250.00</code> becomes <code>1250</code>, leading zeros stay</small></span><input type="checkbox" id="oNumbers" checked><span class="track"></span></label>
+          </div>
+          <button class="pill ink wide" id="cleanBtn" disabled>Clean my data</button>
+          <div class="note" id="notice" hidden></div>
+        </div>
+      </div>
+    </div>
   </section>
 
-  <section class="card">
-    <div class="step">Step 1</div>
-    <h2>Upload your file</h2>
-    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose an Excel or CSV file">
-      <b>Drop an Excel or CSV file here</b>
-      <span class="muted">or click to choose · .xlsx, .xls, .csv</span>
+  <section class="band" id="results" hidden>
+    <div class="frame section">
+      <h2 class="h-lg">Your cleaned data</h2>
+      <p class="sub" id="summary"></p>
+      <div class="actions">
+        <button class="pill ink" id="download">Download cleaned Excel <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>
+      </div>
+      <div class="panel">
+        <div class="panel-top">
+          <div class="seg" id="tabs" role="tablist">
+            <button type="button" role="tab" aria-selected="true" data-v="preview">Cleaned data</button>
+            <button type="button" role="tab" aria-selected="false" data-v="log">Change log</button>
+          </div>
+          <span class="fine" id="legend"></span>
+        </div>
+        <div class="table-wrap" id="preview"></div>
+        <div class="table-wrap" id="log" hidden></div>
+      </div>
+      <p class="fine" style="text-align:center;margin:14px 0 0" id="previewNote"></p>
     </div>
-    <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
-    <p class="muted" style="margin:12px 0 0;font-size:14px">No file handy? <button class="link" id="sample">Try it with sample data</button></p>
-    <div class="loaded" id="loaded" hidden>
-      <span>Loaded: <b id="fileName"></b></span>
-      <span id="sheetRow" hidden>Sheet <select id="sheet"></select></span>
-    </div>
-    <div class="notice" id="notice" hidden></div>
   </section>
 
-  <section class="card">
-    <div class="step">Step 2</div>
-    <h2>Choose what to fix</h2>
-    <div class="opts">
-      <label class="opt"><input type="checkbox" id="oTrim" checked><div><b>Remove extra spaces</b><span><code>"  Ali   Ahmad "</code> becomes <code>"Ali Ahmad"</code></span></div></label>
-      <label class="opt"><input type="checkbox" id="oEmpty" checked><div><b>Remove empty rows</b><span>Rows with nothing in them are dropped.</span></div></label>
-      <label class="opt"><input type="checkbox" id="oDupes" checked><div><b>Remove duplicate rows</b><span>Exact copies are removed after cleaning. The first copy is kept.</span></div></label>
-      <label class="opt"><input type="checkbox" id="oDates" checked><div><b>Standardise dates</b><span><code>03/03/2026</code>, <code>3 Mar 2026</code> and <code>2026-03-03</code> all become real Excel dates shown as <code>2026-03-03</code>.</span>
-        <select id="dayFirst" aria-label="Date order in your file"><option value="day">Dates in my file are day first (31/12/2026)</option><option value="month">Dates in my file are month first (12/31/2026)</option></select></div></label>
-      <label class="opt"><input type="checkbox" id="oNumbers" checked><div><b>Fix numbers stored as text</b><span><code>"RM 1,250.00"</code> becomes <code>1250</code> so it can be added up. Phone numbers and IDs that start with 0 are left alone.</span></div></label>
-    </div>
-    <button class="btn primary" id="cleanBtn" disabled>Clean my data</button>
-  </section>
-
-  <section class="card" id="results" hidden>
-    <div class="step">Step 3</div>
-    <h2>Your cleaned data</h2>
-    <div class="stats" id="stats"></div>
-    <p class="muted" id="breakdown" style="font-size:13px;margin:0 0 12px"></p>
-    <div class="tabs" role="tablist">
-      <button class="tab" role="tab" aria-selected="true" data-tab="preview">Cleaned data</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="log">Change log</button>
-    </div>
-    <div class="table-wrap" id="preview"></div>
-    <div class="table-wrap" id="log" hidden></div>
-    <p class="muted" id="previewNote" style="font-size:13px;margin:8px 0 0"></p>
-    <div class="actions">
-      <button class="btn primary" id="download">Download cleaned Excel</button>
-      <span class="muted" style="font-size:13px">The file has 3 sheets: Cleaned Data, Change Log and Summary.</span>
+  <section class="band">
+    <div class="frame section">
+      <h2 class="h-lg">It cleans the mess, not your data</h2>
+      <p class="sub">Three rules keep the values that matter exactly as they were.</p>
+      <div class="cards">
+        <article class="feat">
+          <span class="num-tag">01</span>
+          <h3>Leading zeros stay</h3>
+          <p>Phone numbers, staff IDs and account numbers stay as text, so 0123 never turns into 123 and a long account number never turns into 1.2E+12.</p>
+          <div class="mini mini-rows">
+            <div><span>Phone</span><span>012-345 6789</span></div>
+            <div><span>Staff ID</span><span>00123</span></div>
+            <div><span>Account</span><span>1234567890123</span></div>
+          </div>
+        </article>
+        <article class="feat">
+          <span class="num-tag">02</span>
+          <h3>Dates follow your order</h3>
+          <p>Tell it how your team writes dates. A date that cannot exist, like month 31, is left alone instead of guessed.</p>
+          <div class="mini">
+            <div class="seg" aria-hidden="true"><span aria-checked="true">Day first</span><span>Month first</span></div>
+            <div class="mini-line"><code>03/04/2026</code> → <code>2026-04-03</code></div>
+          </div>
+        </article>
+        <article class="feat">
+          <span class="num-tag">03</span>
+          <h3>Every change is on record</h3>
+          <p>The download comes with a Change Log sheet listing the row, the column, the old value and the new one, ready for a reviewer.</p>
+          <div class="mini mini-rows">
+            <div><span>Row 2</span><span>RM 1,250.00 → 1250</span></div>
+            <div><span>Row 6</span><span>6/3/26 → 2026-03-06</span></div>
+            <div><span>Row 8</span><span>duplicate removed</span></div>
+          </div>
+        </article>
+      </div>
     </div>
   </section>
 </main>
 
-<footer>
-  <div class="wrap">
-    Built by <a href="https://www.linkedin.com/in/afiq-izzudin-27aaa936b">Ahmad Afiq Izzudin</a>, Business Process &amp; Automation Analyst, with AI assistance.
-    <span id="srcWrap"> · <a id="src" href="#">View the code on GitHub</a></span>
+<footer class="band">
+  <div class="frame bar">
+    <span>© 2026 Ahmad Afiq Izzudin · Built with AI assistance</span>
+    <span><a href="https://www.linkedin.com/in/afiq-izzudin-27aaa936b">LinkedIn</a><a href="https://github.com/Afiqizzudinnn">GitHub</a></span>
   </div>
 </footer>
 
@@ -318,6 +437,16 @@ function clean(grid, o, csv) {
 }
 
 // ---------- UI ----------
+const segValue = el => el.querySelector('[aria-checked="true"], [aria-selected="true"]').dataset.v;
+function segInit(el, attr, onChange) {
+  el.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    el.querySelectorAll('button').forEach(x => x.setAttribute(attr, x === b));
+    if (onChange) onChange(b.dataset.v);
+  });
+}
+const plural = (n, word) => `<b>${n}</b> ${word}${n === 1 ? '' : 's'}`;
 function notice(msg) { $('#notice').textContent = msg; $('#notice').hidden = !msg; }
 
 function useWorkbook(wb, name, csv) {
@@ -325,7 +454,7 @@ function useWorkbook(wb, name, csv) {
   $('#sheet').innerHTML = wb.SheetNames.map(s => `<option>${esc(s)}</option>`).join('');
   $('#sheetRow').hidden = wb.SheetNames.length < 2;
   $('#fileName').textContent = name;
-  $('#loaded').hidden = false;
+  $('#fileName').classList.add('loaded');
   $('#cleanBtn').disabled = false;
   $('#results').hidden = true;
   notice('');
@@ -340,7 +469,7 @@ async function loadFile(files) {
 
 function run(scroll) {
   const o = { trim: $('#oTrim').checked, empty: $('#oEmpty').checked, dupes: $('#oDupes').checked,
-    dates: $('#oDates').checked, dayFirst: $('#dayFirst').value === 'day', numbers: $('#oNumbers').checked };
+    dates: $('#oDates').checked, dayFirst: segValue($('#dayOrder')) === 'day', numbers: $('#oNumbers').checked };
   try { state.res = clean(sheetToGrid(state.wb.Sheets[$('#sheet').value]), o, state.csv); }
   catch (e) { notice(e.message); return; }
   render(state.res);
@@ -349,13 +478,13 @@ function run(scroll) {
 
 function render(r) {
   const c = r.counts;
-  $('#stats').innerHTML = [
-    [`${r.before} → ${r.rows.length}`, 'data rows before → after'],
-    [c.dupes, 'duplicate rows removed'],
-    [c.empty, 'empty rows removed'],
-    [c.cells, 'cells fixed'],
-  ].map(([n, l]) => `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
-  $('#breakdown').textContent = `Cell fixes: ${c.spaces} extra spaces · ${c.dates} text dates · ${c.numbers} numbers stored as text`;
+  const removed = [c.dupes && plural(c.dupes, 'duplicate row'), c.empty && plural(c.empty, 'empty row')].filter(Boolean);
+  const did = [];
+  if (removed.length) did.push('removed ' + removed.join(' and '));
+  if (c.cells) did.push('fixed ' + plural(c.cells, 'cell'));
+  const said = did.join(removed.length > 1 ? ', and ' : ' and ');
+  $('#summary').innerHTML = `${plural(r.before, 'row')} went in, <b>${r.rows.length}</b> came out. `
+    + (said ? said[0].toUpperCase() + said.slice(1) + '.' : 'Nothing needed fixing.');
 
   const head = `<thead><tr>${r.headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>`;
   const body = r.rows.slice(0, PREVIEW_ROWS).map((row, i) => `<tr>${row.map((v, ci) => {
@@ -367,12 +496,14 @@ function render(r) {
   const logBody = r.log.slice(0, LOG_ROWS).map(l => `<tr><td class="num">${l.row}</td><td>${esc(l.col)}</td><td>${esc(l.type)}</td><td>${esc(l.before)}</td><td>${esc(l.after)}</td></tr>`).join('');
   $('#log').innerHTML = r.log.length
     ? `<table><thead><tr><th>Excel row</th><th>Column</th><th>What changed</th><th>Before</th><th>After</th></tr></thead><tbody>${logBody}</tbody></table>`
-    : '<p style="padding:12px;margin:0" class="muted">Nothing needed fixing. Your data was already clean.</p>';
+    : '<p class="empty-msg">Nothing needed fixing. Your data was already clean.</p>';
+  document.querySelector('#tabs [data-v="log"]').textContent = `Change log (${r.log.length})`;
+  $('#legend').innerHTML = `<span class="swatch"></span>Changed cell. Hover it to see the old value.`;
 
   const more = [];
-  if (r.rows.length > PREVIEW_ROWS) more.push(`showing the first ${PREVIEW_ROWS} of ${r.rows.length} rows`);
-  if (r.log.length > LOG_ROWS) more.push(`the log shows the first ${LOG_ROWS} of ${r.log.length} changes`);
-  $('#previewNote').innerHTML = `<span class="legend"></span>Highlighted cells were changed. Hover one to see what it was before.${more.length ? ` (${more.join('; ')}, the download has everything.)` : ''}`;
+  if (r.rows.length > PREVIEW_ROWS) more.push(`Showing the first ${PREVIEW_ROWS} of ${r.rows.length} rows.`);
+  if (r.log.length > LOG_ROWS) more.push(`The log shows the first ${LOG_ROWS} of ${r.log.length} changes.`);
+  $('#previewNote').textContent = (more.length ? more.join(' ') + ' ' : '') + 'The download has 3 sheets: Cleaned Data, Change Log and Summary.';
   $('#results').hidden = false;
 }
 
@@ -416,27 +547,17 @@ function sampleWorkbook() {
 
 // ---------- Wiring ----------
 const drop = $('#drop'), input = $('#file');
-drop.addEventListener('click', () => input.click());
-drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+$('#pick').addEventListener('click', () => input.click());
 input.addEventListener('change', () => { loadFile([...input.files]); input.value = ''; });
 ['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
 drop.addEventListener('drop', e => loadFile([...e.dataTransfer.files]));
 
+segInit($('#dayOrder'), 'aria-checked');
+segInit($('#tabs'), 'aria-selected', v => { $('#preview').hidden = v !== 'preview'; $('#log').hidden = v !== 'log'; });
 $('#sample').addEventListener('click', () => { useWorkbook(sampleWorkbook(), 'sample_expense_claims.xlsx', false); run(true); });
 $('#cleanBtn').addEventListener('click', () => run(true));
 $('#download').addEventListener('click', download);
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
-  document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x === t));
-  $('#preview').hidden = t.dataset.tab !== 'preview';
-  $('#log').hidden = t.dataset.tab !== 'log';
-}));
-
-(() => {
-  const host = location.hostname, repo = location.pathname.split('/').filter(Boolean)[0];
-  if (host.endsWith('.github.io') && repo) $('#src').href = `https://github.com/${host.split('.')[0]}/${repo}`;
-  else $('#srcWrap').hidden = true;
-})();
 
 if (typeof XLSX === 'undefined') notice('The spreadsheet library did not load. Check your internet connection and refresh the page.');
 else if (new URLSearchParams(location.search).has('demo')) { useWorkbook(sampleWorkbook(), 'sample_expense_claims.xlsx', false); run(false); }

@@ -35,7 +35,7 @@ Every change goes into a **Change Log** sheet (Excel row, column, before, after)
 - **Your file never leaves your computer.** Everything runs inside the browser. Nothing is uploaded.
 - **Phone, IC and account numbers stay as text**, so leading zeros and long digits are not lost.
 - **Dates follow the order you choose**: day first (Malaysia, UK) or month first (US).
-- **Nothing is hidden.** Changed cells are highlighted, and you can untick any fix you do not want.
+- **Nothing is hidden.** Changed cells are highlighted, and you can switch off any fix you do not want.
 
 ## Business impact (estimate)
 
@@ -45,7 +45,7 @@ If one analyst cleans one export a day and the tool saves 20 minutes each time, 
 
 1. Open the [live tool](https://afiqizzudinnn.github.io/excel-data-cleaner/).
 2. Drop in an `.xlsx`, `.xls` or `.csv` file, or click **Try it with sample data**.
-3. Untick anything you do not want fixed, then click **Clean my data**.
+3. Switch off anything you do not want fixed, then click **Clean my data**.
 4. Check the highlighted cells and the change log, then click **Download cleaned Excel**.
 
 The download has 3 sheets: Cleaned Data, Change Log and Summary.
