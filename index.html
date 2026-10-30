@@ -1,597 +1,174 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Excel Data Cleaner</title>
-<meta name="description" content="Fix a messy Excel or CSV export: extra spaces, empty rows, duplicates, mixed dates and numbers stored as text. Every change is logged.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cal+Sans&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<style>
-  /* Cal.com style: monochrome, one blue accent, pill buttons, soft cards on paper. */
-  :root {
-    --ink: #101010; --graphite: #242424; --slate: #6b7280; --stone: #898989; --silver: #e5e7eb;
-    --paper: #f4f4f4; --white: #ffffff; --blue: #0099ff; --info: #eff6fe; --line: #e2e2e2; --mark: #c4c4c4;
-    --sh-card: rgba(36,36,36,.05) 0 4px 8px 0;
-    --sh-hover: rgba(36,36,36,.7) 0 1px 5px -4px, rgba(36,36,36,.05) 0 4px 8px 0;
-    --sh-ring: rgba(19,19,22,.7) 0 1px 5px -4px, rgba(34,42,53,.08) 0 0 0 1px, rgba(34,42,53,.05) 0 4px 8px 0;
-    --sh-chip: rgba(0,0,0,.1) 0 1px 3px 0, rgba(0,0,0,.06) 0 0 2px 0;
-    --sh-press: rgba(255,255,255,.15) 0 2px 0 0 inset;
-    --display: "Cal Sans", Poppins, ui-sans-serif, system-ui, sans-serif;
-    --ui: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
-  }
-  * { box-sizing: border-box; }
-  [hidden] { display: none !important; }
-  html { color-scheme: light; }
-  body { margin: 0; background: var(--paper); color: var(--graphite); font: 300 16px/1.5 var(--ui); letter-spacing: -0.19px; -webkit-font-smoothing: antialiased; }
-  a { color: inherit; }
-  button, input, select { font: inherit; letter-spacing: inherit; color: inherit; }
-  h1, h2, h3 { font-family: var(--display); font-weight: 400; color: var(--graphite); margin: 0; }
-  b { font-weight: 500; color: var(--graphite); }
-  code { font: 400 12px/1.4 var(--mono); letter-spacing: 0; background: var(--paper); padding: 1px 5px; border-radius: 4px; }
-  .chev { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Excel Data Cleaner</title>
+  <meta name="description" content="Fix a messy Excel or CSV export: extra spaces, empty rows, duplicates, mixed dates and numbers stored as text. Every change is logged.">
 
-  /* Drafting frame: faint guide lines with a + where they cross */
-  .band { border-bottom: 1px solid var(--line); }
-  .frame { position: relative; width: min(1200px, 100% - 32px); margin: 0 auto; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
-  .frame::before, .frame::after { content: ""; position: absolute; bottom: -5px; width: 9px; height: 9px; z-index: 1;
-    background: linear-gradient(var(--mark), var(--mark)) center / 9px 1px no-repeat, linear-gradient(var(--mark), var(--mark)) center / 1px 9px no-repeat; }
-  .frame::before { left: -5px; }
-  .frame::after { right: -5px; }
-  .pad { padding: 24px; }
-  .section { padding: 96px 48px; }
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cal+Sans&family=Inter:wght@300;400;500;600&display=swap">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/cleaner.css">
 
-  /* Header */
-  .bar { display: flex; align-items: center; gap: 24px; min-height: 64px; padding: 0 24px; }
-  .wordmark { font-family: var(--display); font-size: 22px; letter-spacing: .2px; color: var(--ink); text-decoration: none; }
-  .nav { display: flex; gap: 2px; margin: 0 auto; }
-  .nav a { font-size: 14px; font-weight: 400; letter-spacing: -.2px; color: var(--slate); text-decoration: none; padding: 6px 10px; border-radius: 8px; white-space: nowrap; transition: color .2s ease; }
-  .nav a:hover { color: var(--graphite); }
-  .nav a[aria-current] { color: var(--ink); font-weight: 500; pointer-events: none; }
-  .btn-rect { display: inline-flex; align-items: center; gap: 4px; background: var(--ink); color: #fff; text-decoration: none; font-size: 14px; font-weight: 500; padding: 7px 10px 7px 14px; border-radius: 8px; box-shadow: var(--sh-press); }
-  .btn-rect:hover { background: #2a2a2a; }
-
-  /* Buttons and small controls */
-  .pill { display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 0; border-radius: 9999px; padding: 10px 20px; font-size: 14px; font-weight: 500; letter-spacing: -.2px; text-decoration: none; cursor: pointer; transition: background .15s, box-shadow .15s; }
-  .pill.ink { background: var(--ink); color: #fff; box-shadow: var(--sh-press); }
-  .pill.ink:hover { background: #2a2a2a; }
-  .pill.soft { background: var(--paper); color: var(--graphite); }
-  .pill.soft:hover { background: #ebebeb; }
-  .pill.white { background: #fff; color: var(--graphite); box-shadow: var(--sh-ring); }
-  .pill.wide { width: 100%; }
-  .pill:disabled { opacity: .35; cursor: not-allowed; }
-  .tag { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 400; letter-spacing: -.24px; color: var(--graphite); background: #fff; border-radius: 9999px; padding: 3px 8px 3px 10px; text-decoration: none; box-shadow: rgba(34,42,53,.1) 0 0 0 1px, rgba(34,42,53,.05) 0 2px 4px 0; }
-  .seg { display: inline-flex; gap: 2px; padding: 2px; background: var(--paper); border-radius: 8px; }
-  .seg > * { border: 0; background: transparent; border-radius: 6px; padding: 4px 10px; font-size: 13px; font-weight: 400; color: var(--slate); cursor: pointer; white-space: nowrap; }
-  .seg > [aria-checked="true"], .seg > [aria-selected="true"] { background: #fff; color: var(--ink); font-weight: 500; box-shadow: var(--sh-chip); }
-  .fine { font-size: 12px; letter-spacing: -.24px; color: var(--slate); }
-  .note { margin: 12px 0 0; font-size: 13.5px; background: var(--info); border-radius: 8px; padding: 10px 12px; box-shadow: inset 2px 0 0 var(--blue); }
-  select { background: #fff; border: 1px solid var(--silver); border-radius: 8px; padding: 6px 10px; font-size: 14px; font-weight: 400; }
-  select:focus { outline: none; border-color: var(--graphite); box-shadow: 0 0 0 3px rgba(16,16,16,.08); }
-
-  /* Hero */
-  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 56px; align-items: center; background: #fff; border-radius: 12px; box-shadow: var(--sh-card); padding: 56px; }
-  .hero h1 { font-size: clamp(40px, 5vw, 60px); line-height: 1.1; letter-spacing: .6px; margin: 20px 0 16px; }
-  .lede { color: var(--slate); max-width: 46ch; margin: 0; }
-  .cta { display: grid; gap: 8px; margin-top: 28px; max-width: 440px; }
-  .cta + .fine { margin: 12px 0 0; }
-
-  /* Widget: the tool itself, styled like Cal's booking card */
-  .widget { background: #fff; border-radius: 12px; box-shadow: var(--sh-ring); padding: 24px; transition: box-shadow .15s; }
-  .widget.over { box-shadow: 0 0 0 2px var(--ink), var(--sh-card); }
-  .w-head { display: flex; gap: 12px; align-items: center; }
-  .ico { width: 40px; height: 40px; border-radius: 9999px; background: var(--paper); display: grid; place-items: center; flex: none; }
-  .ico svg { width: 20px; height: 20px; fill: none; stroke: var(--graphite); stroke-width: 1.4; }
-  .w-kicker { font-size: 13px; color: var(--slate); letter-spacing: -.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .w-kicker.loaded { color: var(--graphite); font-weight: 500; }
-  .w-title { font-size: 20px; line-height: 1.3; letter-spacing: .2px; }
-  .w-desc { font-size: 14px; color: var(--slate); margin: 12px 0 16px; }
-  .w-field { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--slate); margin-bottom: 16px; }
-  .rules { margin: 0 -24px 20px; border-top: 1px solid var(--silver); }
-  .rule { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 24px; border-bottom: 1px solid var(--silver); cursor: pointer; }
-  .rule b { display: block; font-size: 14px; letter-spacing: -.2px; }
-  .rule small { display: block; font-size: 12.5px; color: var(--slate); letter-spacing: -.24px; }
-  .rule input { position: absolute; opacity: 0; pointer-events: none; }
-  .track { flex: none; position: relative; width: 32px; height: 18px; border-radius: 9999px; background: var(--silver); transition: background .15s; }
-  .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: var(--sh-chip); transition: transform .15s; }
-  .rule input:checked + .track { background: var(--ink); }
-  .rule input:checked + .track::after { transform: translateX(14px); }
-  .rule input:focus-visible + .track { outline: 2px solid var(--blue); outline-offset: 2px; }
-  .rule.sub { cursor: default; padding-top: 8px; padding-bottom: 12px; }
-
-  /* Sections */
-  .h-lg { font-size: clamp(32px, 4vw, 48px); line-height: 1.1; letter-spacing: .48px; text-align: center; }
-  .sub { text-align: center; color: var(--slate); max-width: 600px; margin: 14px auto 0; }
-  .sub b { font-family: var(--display); font-weight: 400; letter-spacing: .2px; }
-  .actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
-  .panel { background: #fff; border-radius: 12px; box-shadow: var(--sh-card); margin-top: 40px; overflow: hidden; }
-  .panel-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 20px; border-bottom: 1px solid var(--silver); }
-  .table-wrap { overflow: auto; max-height: 460px; }
-  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-weight: 400; letter-spacing: -.1px; }
-  th, td { padding: 9px 14px; border-bottom: 1px solid var(--silver); text-align: left; white-space: nowrap; }
-  th { position: sticky; top: 0; z-index: 1; background: #fafafa; font-weight: 500; font-size: 12.5px; color: var(--slate); }
-  tr:last-child td { border-bottom: 0; }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td.changed { background: var(--info); }
-  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--info); box-shadow: rgba(0,153,255,.45) 0 0 0 1px; margin-right: 6px; vertical-align: -1px; }
-  .empty-msg { padding: 20px; margin: 0; color: var(--slate); font-size: 14px; }
-
-  /* Feature cards with a small piece of UI at the bottom */
-  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 48px; }
-  .feat { background: #fff; border-radius: 12px; box-shadow: var(--sh-card); padding: 24px; display: flex; flex-direction: column; transition: box-shadow .15s; }
-  .feat:hover { box-shadow: var(--sh-hover); }
-  .num-tag { align-self: flex-start; font-size: 12px; color: var(--slate); background: var(--paper); border-radius: 6px; padding: 1px 7px; letter-spacing: -.24px; }
-  .feat h3 { font-size: 20px; line-height: 1.3; letter-spacing: .2px; margin: 16px 0 4px; }
-  .feat p { font-size: 15px; color: var(--slate); margin: 0; }
-  .mini { margin-top: auto; padding-top: 28px; }
-  .mini-rows { border-radius: 8px; box-shadow: rgba(34,42,53,.1) 0 0 0 1px; overflow: hidden; font-size: 12.5px; font-weight: 400; }
-  .mini-rows div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-bottom: 1px solid var(--silver); }
-  .mini-rows div:last-child { border-bottom: 0; }
-  .mini-rows span:first-child { color: var(--slate); }
-  .mini-rows span:last-child { font-family: var(--mono); font-size: 12px; letter-spacing: 0; }
-  .mini-line { margin-top: 10px; font-size: 13px; color: var(--slate); }
-
-  footer .bar { justify-content: space-between; flex-wrap: wrap; font-size: 13px; color: var(--slate); letter-spacing: -.2px; }
-  footer .bar a { color: var(--slate); text-decoration: none; margin-left: 16px; }
-  footer .bar a:hover { color: var(--ink); }
-
-  /* Slide between the tools (Chrome, Edge, Safari 18.2+; other browsers just load the page).
-     The header stays still, the page slides, and each menu label fades between grey and black. */
-  @view-transition { navigation: auto; }
-  header.band { view-transition-name: site-header; }
-  main { view-transition-name: page; }
-  .nav a:nth-child(1) { view-transition-name: nav-1; }
-  .nav a:nth-child(2) { view-transition-name: nav-2; }
-  .nav a:nth-child(3) { view-transition-name: nav-3; }
-  ::view-transition-group(site-header), ::view-transition-new(site-header) { animation: none; }
-  ::view-transition-old(site-header) { display: none; }
-  ::view-transition-group(page) { animation-duration: 540ms; animation-timing-function: cubic-bezier(.22,.61,.36,1); }
-  ::view-transition-old(page) { animation: 200ms cubic-bezier(.4,0,1,1) both vt-out-left; mix-blend-mode: normal; }
-  ::view-transition-new(page) { animation: 420ms cubic-bezier(0,0,.2,1) 120ms both vt-in-right; mix-blend-mode: normal; }
-  html:active-view-transition-type(back)::view-transition-old(page) { animation-name: vt-out-right; }
-  html:active-view-transition-type(back)::view-transition-new(page) { animation-name: vt-in-left; }
-  ::view-transition-group(nav-1), ::view-transition-group(nav-2), ::view-transition-group(nav-3) { animation-duration: 420ms; animation-timing-function: ease; }
-  @keyframes vt-out-left { to { transform: translateX(-40px); opacity: 0; } }
-  @keyframes vt-out-right { to { transform: translateX(40px); opacity: 0; } }
-  @keyframes vt-in-right { from { transform: translateX(72px); opacity: 0; } }
-  @keyframes vt-in-left { from { transform: translateX(-72px); opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
-  @media (max-width: 960px) {
-    .hero { grid-template-columns: 1fr; padding: 32px 24px; gap: 36px; }
-    .cards { grid-template-columns: 1fr; }
-    .section { padding: 64px 16px; }
-  }
-  @media (max-width: 720px) {
-    .bar { flex-wrap: wrap; gap: 8px 16px; padding: 12px 16px; }
-    .nav { order: 3; width: 100%; margin: 0 -10px; overflow-x: auto; }
-    .btn-rect { margin-left: auto; }
-    .pad { padding: 12px; }
-  }
-</style>
-<script>
-  // Slide left when moving right in the menu, and right when moving back.
-  addEventListener('pagereveal', e => {
-    const from = window.navigation && navigation.activation && navigation.activation.from;
-    if (!e.viewTransition || !e.viewTransition.types || !from) return;
-    const order = ['excel-data-cleaner', 'excel-report-merger', 'automation-roi-calculator'];
-    const at = url => order.findIndex(p => new URL(url).pathname.includes('/' + p + '/'));
-    e.viewTransition.types.add(at(from.url) > at(location.href) ? 'back' : 'forward');
-  });
-</script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="js/page-transition.js"></script>
+  <script type="module" src="js/main.js"></script>
 </head>
 <body>
-<header class="band">
-  <div class="frame bar">
-    <a class="wordmark" href="https://www.linkedin.com/in/afiq-izzudin-27aaa936b">minutecounts</a>
-    <nav class="nav" aria-label="Office Toolkit">
-      <a href="../excel-data-cleaner/" aria-current="page">Data Cleaner</a>
-      <a href="../excel-report-merger/">Report Merger</a>
-      <a href="../automation-roi-calculator/">ROI Calculator</a>
-    </nav>
-    <a class="btn-rect" href="https://github.com/Afiqizzudinnn/excel-data-cleaner">View code <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></a>
-  </div>
-</header>
+  <header class="band site-header">
+    <div class="frame site-bar">
+      <a class="wordmark" href="https://www.linkedin.com/in/afiq-izzudin-27aaa936b">minutecounts</a>
+      <nav class="nav" aria-label="Office Toolkit">
+        <a href="../excel-data-cleaner/" aria-current="page">Data Cleaner</a>
+        <a href="../excel-report-merger/">Report Merger</a>
+        <a href="../automation-roi-calculator/">ROI Calculator</a>
+      </nav>
+      <a class="btn-rect" href="https://github.com/Afiqizzudinnn/excel-data-cleaner">
+        View code <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+      </a>
+    </div>
+  </header>
 
-<main>
-  <section class="band">
-    <div class="frame pad">
-      <div class="hero">
-        <div>
-          <a class="tag" href="https://github.com/Afiqizzudinnn/excel-data-cleaner">Free and open source <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></a>
-          <h1>Fix a messy Excel export without retyping a cell</h1>
-          <p class="lede">Stray spaces, blank rows, the same claim entered twice, dates in five formats and “RM 1,250.00” stuck as text. Drop the file in, choose what to fix, and get a clean sheet with a log of every change.</p>
-          <div class="cta">
-            <button class="pill ink" id="sample">Try it with sample data</button>
-            <button class="pill soft" id="pick">Upload your own file <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>
-          </div>
-          <p class="fine">Runs in your browser. Your file is never uploaded.</p>
-          <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
-        </div>
-
-        <div class="widget" id="drop">
-          <div class="w-head">
-            <span class="ico"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="3.5" width="13" height="13" rx="2"/><path d="M3.5 8h13M3.5 12h13M8 8v8.5"/></svg></span>
-            <div style="min-width:0">
-              <div class="w-kicker" id="fileName">No file yet</div>
-              <h2 class="w-title">Cleaning rules</h2>
+  <main>
+    <section class="band">
+      <div class="frame pad">
+        <div class="hero">
+          <div>
+            <a class="tag" href="https://github.com/Afiqizzudinnn/excel-data-cleaner">
+              Free and open source <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+            </a>
+            <h1>Fix a messy Excel export without retyping a cell</h1>
+            <p class="lede">Stray spaces, blank rows, the same claim entered twice, dates in five formats and “RM 1,250.00” stuck as text. Drop the file in, choose what to fix, and get a clean sheet with a log of every change.</p>
+            <div class="cta">
+              <button class="pill pill--ink" id="sample" type="button">Try it with sample data</button>
+              <button class="pill pill--soft" id="pick" type="button">
+                Upload your own file <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+              </button>
             </div>
+            <p class="fine">Runs in your browser. Your file is never uploaded.</p>
+            <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden>
           </div>
-          <p class="w-desc">Drag an .xlsx, .xls or .csv file onto this card. Switch off anything you want left as it is.</p>
-          <div class="w-field" id="sheetRow" hidden>Sheet <select id="sheet"></select></div>
-          <div class="rules">
-            <label class="rule"><span><b>Remove extra spaces</b><small><code>"  Ali   Ahmad "</code> becomes <code>Ali Ahmad</code></small></span><input type="checkbox" id="oTrim" checked><span class="track"></span></label>
-            <label class="rule"><span><b>Remove empty rows</b><small>Rows with nothing in them are dropped</small></span><input type="checkbox" id="oEmpty" checked><span class="track"></span></label>
-            <label class="rule"><span><b>Remove duplicate rows</b><small>Checked after cleaning, the first copy is kept</small></span><input type="checkbox" id="oDupes" checked><span class="track"></span></label>
-            <label class="rule"><span><b>Turn text into real dates</b><small><code>3 Mar 2026</code> and <code>03/03/26</code> become <code>2026-03-03</code></small></span><input type="checkbox" id="oDates" checked><span class="track"></span></label>
-            <div class="rule sub"><small>Dates in my file are written</small>
-              <div class="seg" id="dayOrder" role="radiogroup" aria-label="Date order"><button type="button" role="radio" aria-checked="true" data-v="day">Day first</button><button type="button" role="radio" aria-checked="false" data-v="month">Month first</button></div>
+
+          <div class="widget" id="drop-zone">
+            <div class="widget-head">
+              <span class="icon-badge">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="3.5" width="13" height="13" rx="2"/><path d="M3.5 8h13M3.5 12h13M8 8v8.5"/></svg>
+              </span>
+              <div class="widget-head__text">
+                <div class="widget-kicker" id="file-name">No file yet</div>
+                <h2 class="widget-title">Cleaning rules</h2>
+              </div>
             </div>
-            <label class="rule"><span><b>Fix numbers stored as text</b><small><code>RM 1,250.00</code> becomes <code>1250</code>, leading zeros stay</small></span><input type="checkbox" id="oNumbers" checked><span class="track"></span></label>
+            <p class="widget-desc">Drag an .xlsx, .xls or .csv file onto this card. Switch off anything you want left as it is.</p>
+            <div class="sheet-field" id="sheet-field" hidden>Sheet <select id="sheet"></select></div>
+
+            <div class="widget-list">
+              <label class="toggle-row">
+                <span><b>Remove extra spaces</b><small><code>"  Ali   Ahmad "</code> becomes <code>Ali Ahmad</code></small></span>
+                <input type="checkbox" id="opt-trim" checked><span class="switch"></span>
+              </label>
+              <label class="toggle-row">
+                <span><b>Remove empty rows</b><small>Rows with nothing in them are dropped</small></span>
+                <input type="checkbox" id="opt-empty" checked><span class="switch"></span>
+              </label>
+              <label class="toggle-row">
+                <span><b>Remove duplicate rows</b><small>Checked after cleaning, the first copy is kept</small></span>
+                <input type="checkbox" id="opt-dupes" checked><span class="switch"></span>
+              </label>
+              <label class="toggle-row">
+                <span><b>Turn text into real dates</b><small><code>3 Mar 2026</code> and <code>03/03/26</code> become <code>2026-03-03</code></small></span>
+                <input type="checkbox" id="opt-dates" checked><span class="switch"></span>
+              </label>
+              <div class="toggle-row toggle-row--sub">
+                <small>Dates in my file are written</small>
+                <div class="seg" id="day-order" role="radiogroup" aria-label="Date order">
+                  <button type="button" role="radio" aria-checked="true" data-value="day">Day first</button>
+                  <button type="button" role="radio" aria-checked="false" data-value="month">Month first</button>
+                </div>
+              </div>
+              <label class="toggle-row">
+                <span><b>Fix numbers stored as text</b><small><code>RM 1,250.00</code> becomes <code>1250</code>, leading zeros stay</small></span>
+                <input type="checkbox" id="opt-numbers" checked><span class="switch"></span>
+              </label>
+            </div>
+
+            <button class="pill pill--ink pill--wide" id="clean" type="button" disabled>Clean my data</button>
+            <p class="note" id="notice" hidden></p>
           </div>
-          <button class="pill ink wide" id="cleanBtn" disabled>Clean my data</button>
-          <div class="note" id="notice" hidden></div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="band" id="results" hidden>
-    <div class="frame section">
-      <h2 class="h-lg">Your cleaned data</h2>
-      <p class="sub" id="summary"></p>
-      <div class="actions">
-        <button class="pill ink" id="download">Download cleaned Excel <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>
-      </div>
-      <div class="panel">
-        <div class="panel-top">
-          <div class="seg" id="tabs" role="tablist">
-            <button type="button" role="tab" aria-selected="true" data-v="preview">Cleaned data</button>
-            <button type="button" role="tab" aria-selected="false" data-v="log">Change log</button>
-          </div>
-          <span class="fine" id="legend"></span>
+    <section class="band" id="results" hidden>
+      <div class="frame section">
+        <h2 class="heading-lg">Your cleaned data</h2>
+        <p class="sub" id="summary"></p>
+        <div class="actions">
+          <button class="pill pill--ink" id="download" type="button">
+            Download cleaned Excel <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </button>
         </div>
-        <div class="table-wrap" id="preview"></div>
-        <div class="table-wrap" id="log" hidden></div>
+        <div class="panel">
+          <div class="panel-top">
+            <div class="seg" id="tabs" role="tablist">
+              <button type="button" role="tab" aria-selected="true" data-value="preview">Cleaned data</button>
+              <button type="button" role="tab" aria-selected="false" data-value="log">Change log</button>
+            </div>
+            <span class="fine"><span class="swatch"></span>Changed cell. Hover it to see the old value.</span>
+          </div>
+          <div class="table-wrap" id="preview"></div>
+          <div class="table-wrap" id="log" hidden></div>
+        </div>
+        <p class="fine fine--center" id="footnote"></p>
       </div>
-      <p class="fine" style="text-align:center;margin:14px 0 0" id="previewNote"></p>
-    </div>
-  </section>
+    </section>
 
-  <section class="band">
-    <div class="frame section">
-      <h2 class="h-lg">It cleans the mess, not your data</h2>
-      <p class="sub">Three rules keep the values that matter exactly as they were.</p>
-      <div class="cards">
-        <article class="feat">
-          <span class="num-tag">01</span>
-          <h3>Leading zeros stay</h3>
-          <p>Phone numbers, staff IDs and account numbers stay as text, so 0123 never turns into 123 and a long account number never turns into 1.2E+12.</p>
-          <div class="mini mini-rows">
-            <div><span>Phone</span><span>012-345 6789</span></div>
-            <div><span>Staff ID</span><span>00123</span></div>
-            <div><span>Account</span><span>1234567890123</span></div>
-          </div>
-        </article>
-        <article class="feat">
-          <span class="num-tag">02</span>
-          <h3>Dates follow your order</h3>
-          <p>Tell it how your team writes dates. A date that cannot exist, like month 31, is left alone instead of guessed.</p>
-          <div class="mini">
-            <div class="seg" aria-hidden="true"><span aria-checked="true">Day first</span><span>Month first</span></div>
-            <div class="mini-line"><code>03/04/2026</code> → <code>2026-04-03</code></div>
-          </div>
-        </article>
-        <article class="feat">
-          <span class="num-tag">03</span>
-          <h3>Every change is on record</h3>
-          <p>The download comes with a Change Log sheet listing the row, the column, the old value and the new one, ready for a reviewer.</p>
-          <div class="mini mini-rows">
-            <div><span>Row 2</span><span>RM 1,250.00 → 1250</span></div>
-            <div><span>Row 6</span><span>6/3/26 → 2026-03-06</span></div>
-            <div><span>Row 8</span><span>duplicate removed</span></div>
-          </div>
-        </article>
+    <section class="band">
+      <div class="frame section">
+        <h2 class="heading-lg">It cleans the mess, not your data</h2>
+        <p class="sub">Three rules keep the values that matter exactly as they were.</p>
+        <div class="cards">
+          <article class="feature">
+            <span class="num-tag">01</span>
+            <h3>Leading zeros stay</h3>
+            <p>Phone numbers, staff IDs and account numbers stay as text, so 0123 never turns into 123 and a long account number never turns into 1.2E+12.</p>
+            <div class="mini mini-rows">
+              <div><span>Phone</span><span>012-345 6789</span></div>
+              <div><span>Staff ID</span><span>00123</span></div>
+              <div><span>Account</span><span>1234567890123</span></div>
+            </div>
+          </article>
+          <article class="feature">
+            <span class="num-tag">02</span>
+            <h3>Dates follow your order</h3>
+            <p>Tell it how your team writes dates. A date that cannot exist, like month 31, is left alone instead of guessed.</p>
+            <div class="mini">
+              <div class="seg" aria-hidden="true"><span aria-checked="true">Day first</span><span>Month first</span></div>
+              <div class="mini-line"><code>03/04/2026</code> → <code>2026-04-03</code></div>
+            </div>
+          </article>
+          <article class="feature">
+            <span class="num-tag">03</span>
+            <h3>Every change is on record</h3>
+            <p>The download comes with a Change Log sheet listing the row, the column, the old value and the new one, ready for a reviewer.</p>
+            <div class="mini mini-rows">
+              <div><span>Row 2</span><span>RM 1,250.00 → 1250</span></div>
+              <div><span>Row 6</span><span>6/3/26 → 2026-03-06</span></div>
+              <div><span>Row 8</span><span>duplicate removed</span></div>
+            </div>
+          </article>
+        </div>
       </div>
+    </section>
+  </main>
+
+  <footer class="band">
+    <div class="frame site-bar site-footer">
+      <span>© 2026 Ahmad Afiq Izzudin · Built with AI assistance</span>
+      <span><a href="https://www.linkedin.com/in/afiq-izzudin-27aaa936b">LinkedIn</a><a href="https://github.com/Afiqizzudinnn">GitHub</a></span>
     </div>
-  </section>
-</main>
-
-<footer class="band">
-  <div class="frame bar">
-    <span>© 2026 Ahmad Afiq Izzudin · Built with AI assistance</span>
-    <span><a href="https://www.linkedin.com/in/afiq-izzudin-27aaa936b">LinkedIn</a><a href="https://github.com/Afiqizzudinnn">GitHub</a></span>
-  </div>
-</footer>
-
-<script>
-const $ = s => document.querySelector(s);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const PREVIEW_ROWS = 200, LOG_ROWS = 300;
-const state = { wb: null, name: '', csv: false, res: null };
-
-// ---------- Excel helpers ----------
-// A cell value is a string, a number, a boolean, or a date object { date: true, serial, z }.
-const EPOCH = Date.UTC(1899, 11, 30);
-const ymdToSerial = (y, m, d) => (Date.UTC(y, m - 1, d) - EPOCH) / 864e5;
-const isDate = v => v !== null && typeof v === 'object' && v.date === true;
-
-function cellValue(cell) {
-  if (!cell || cell.v == null) return '';
-  if (cell.t === 'n') return cell.z && XLSX.SSF.is_date(cell.z) ? { date: true, serial: cell.v, z: cell.z } : cell.v;
-  if (cell.t === 'b') return cell.v;
-  if (cell.t === 'e') return cell.w || '#ERROR';
-  return String(cell.v);
-}
-
-function sheetToGrid(ws) {
-  const out = [];
-  if (!ws || !ws['!ref']) return out;
-  const r = XLSX.utils.decode_range(ws['!ref']);
-  for (let R = r.s.r; R <= r.e.r; R++) {
-    const cells = [];
-    for (let C = r.s.c; C <= r.e.c; C++) cells.push(cellValue(ws[XLSX.utils.encode_cell({ r: R, c: C })]));
-    out.push({ n: R + 1, cells });
-  }
-  return out;
-}
-
-function show(v) {
-  if (v === '' || v == null) return '';
-  if (isDate(v)) return XLSX.SSF.format(v.z, v.serial);
-  if (typeof v === 'number') return String(Math.round(v * 1e6) / 1e6);
-  return String(v);
-}
-
-async function readFile(file) {
-  if (/\.csv$/i.test(file.name)) return { wb: XLSX.read(await file.text(), { type: 'string', raw: true }), csv: true };
-  return { wb: XLSX.read(await file.arrayBuffer(), { type: 'array', cellNF: true }), csv: false };
-}
-
-function sheetFrom(aoa) {
-  const ws = XLSX.utils.aoa_to_sheet(aoa.map(r => r.map(v => isDate(v) ? v.serial : v)));
-  aoa.forEach((r, R) => r.forEach((v, C) => { if (isDate(v)) ws[XLSX.utils.encode_cell({ r: R, c: C })].z = v.z; }));
-  ws['!cols'] = aoa[0].map((_, c) => ({ wch: Math.min(50, Math.max(8, ...aoa.map(r => show(r[c]).length + 2))) }));
-  return ws;
-}
-
-// ---------- Parsing text into dates and numbers ----------
-const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
-  january: 1, february: 2, march: 3, april: 4, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
-  mac: 3, mei: 5, ogos: 8, okt: 10, dis: 12 };
-const fullYear = y => (y = +y) < 100 ? (y < 50 ? 2000 + y : 1900 + y) : y;
-
-function validDate(y, m, d) {
-  if (m < 1 || m > 12 || d < 1 || y < 1900 || y > 2100) return null;
-  return d <= new Date(Date.UTC(y, m, 0)).getUTCDate() ? { y, m, d } : null;
-}
-
-function parseDateString(s, dayFirst) {
-  s = s.trim();
-  let m;
-  if ((m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/))) return validDate(+m[1], +m[2], +m[3]);
-  if ((m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/))) {
-    const a = +m[1], b = +m[2], y = fullYear(m[3]);
-    // Use the chosen order; fall back to the other only when the chosen one is impossible (e.g. month 31).
-    return dayFirst ? validDate(y, b, a) || validDate(y, a, b) : validDate(y, a, b) || validDate(y, b, a);
-  }
-  if ((m = s.match(/^(\d{1,2})[\s-]+([A-Za-z]{3,9})\.?,?[\s-]+(\d{2}|\d{4})$/))) {
-    const mon = MONTHS[m[2].toLowerCase()];
-    return mon ? validDate(fullYear(m[3]), mon, +m[1]) : null;
-  }
-  if ((m = s.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/))) {
-    const mon = MONTHS[m[1].toLowerCase()];
-    return mon ? validDate(+m[3], mon, +m[2]) : null;
-  }
-  return null;
-}
-
-// Returns { n, formatted } or null. "formatted" means the text had a currency, commas or brackets.
-function parseNumberString(s) {
-  let t = s.trim(), neg = false, formatted = false;
-  if (/^\(.+\)$/.test(t)) { neg = true; formatted = true; t = t.slice(1, -1).trim(); }
-  if (t[0] === '-') { neg = !neg; t = t.slice(1).trim(); }
-  const cur = t.match(/^(RM|MYR|SGD|S\$|USD|US\$|\$)\s*/i);
-  if (cur) { formatted = true; t = t.slice(cur[0].length); }
-  if (t[0] === '-') { neg = !neg; t = t.slice(1); }
-  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) { formatted = true; t = t.replace(/,/g, ''); }
-  else if (!/^\d+(\.\d+)?$/.test(t)) return null;
-  const whole = t.split('.')[0];
-  if (whole.length > 1 && whole[0] === '0') return null;   // phone numbers, IDs with a leading zero
-  if (!formatted && whole.length > 9) return null;         // IC, account and card numbers
-  const n = parseFloat(t);
-  return { n: neg ? -n : n, formatted };
-}
-
-// ---------- Cleaning ----------
-const tidy = s => s.replace(/[ \t ]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
-const LABELS = { spaces: 'Extra spaces removed', dates: 'Text date to real date', numbers: 'Text to number' };
-
-function clean(grid, o, csv) {
-  const h = grid.findIndex(r => r.cells.some(v => show(v).trim() !== ''));
-  if (h < 0) throw new Error('This sheet is empty. Pick another sheet or file.');
-  const headers = grid[h].cells.map((v, i) => show(v).replace(/\s+/g, ' ').trim() || `Column ${i + 1}`);
-  const counts = { spaces: 0, dates: 0, numbers: 0, cells: 0, empty: 0, dupes: 0 };
-  const rows = [], marks = [], log = [], seen = new Map();
-  const data = grid.slice(h + 1);
-
-  for (const { n, cells } of data) {
-    const fixes = [], mark = {};
-    const row = headers.map((col, c) => {
-      let v = cells[c] === undefined ? '' : cells[c];
-      const orig = v, what = [];
-      if (typeof v === 'string') {
-        if (o.trim) { const t = tidy(v); if (t !== v) { v = t; what.push('spaces'); } }
-        if (o.dates && v) {
-          const d = parseDateString(v, o.dayFirst);
-          if (d) { v = { date: true, serial: ymdToSerial(d.y, d.m, d.d), z: 'yyyy-mm-dd' }; what.push('dates'); }
-        }
-        if (typeof v === 'string' && v) {
-          const num = parseNumberString(v);
-          // A CSV has no number type, so plain numbers in a CSV are always converted, quietly.
-          if (num && (o.numbers || (csv && !num.formatted))) {
-            v = num.n;
-            if (num.formatted || !csv) what.push('numbers');
-          }
-        }
-      } else if (o.dates && isDate(v) && Number.isInteger(v.serial)) {
-        v = { ...v, z: 'yyyy-mm-dd' };
-      }
-      if (what.length) { fixes.push({ row: n, col, what, before: show(orig), after: show(v) }); mark[c] = show(orig); }
-      return v;
-    });
-
-    if (row.every(v => show(v).trim() === '')) {
-      if (o.empty) { counts.empty++; log.push({ row: n, col: '(whole row)', type: 'Empty row removed', before: '', after: '' }); continue; }
-    } else if (o.dupes) {
-      const key = JSON.stringify(row.map(v => isDate(v) ? 'd' + v.serial : typeof v + ':' + v));
-      if (seen.has(key)) {
-        counts.dupes++;
-        log.push({ row: n, col: '(whole row)', type: `Duplicate of row ${seen.get(key)} removed`, before: row.map(show).join(' | '), after: '' });
-        continue;
-      }
-      seen.set(key, n);
-    }
-
-    for (const f of fixes) {
-      f.what.forEach(k => counts[k]++);
-      counts.cells++;
-      log.push({ row: f.row, col: f.col, type: f.what.map(k => LABELS[k]).join('; '), before: f.before, after: f.after });
-    }
-    rows.push(row);
-    marks.push(mark);
-  }
-  log.sort((a, b) => a.row - b.row);
-  return { headers, rows, marks, log, counts, before: data.length };
-}
-
-// ---------- UI ----------
-const segValue = el => el.querySelector('[aria-checked="true"], [aria-selected="true"]').dataset.v;
-function segInit(el, attr, onChange) {
-  el.addEventListener('click', e => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    el.querySelectorAll('button').forEach(x => x.setAttribute(attr, x === b));
-    if (onChange) onChange(b.dataset.v);
-  });
-}
-const plural = (n, word) => `<b>${n}</b> ${word}${n === 1 ? '' : 's'}`;
-function notice(msg) { $('#notice').textContent = msg; $('#notice').hidden = !msg; }
-
-function useWorkbook(wb, name, csv) {
-  Object.assign(state, { wb, name, csv, res: null });
-  $('#sheet').innerHTML = wb.SheetNames.map(s => `<option>${esc(s)}</option>`).join('');
-  $('#sheetRow').hidden = wb.SheetNames.length < 2;
-  $('#fileName').textContent = name;
-  $('#fileName').classList.add('loaded');
-  $('#cleanBtn').disabled = false;
-  $('#results').hidden = true;
-  notice('');
-}
-
-async function loadFile(files) {
-  const f = files[0];
-  if (!f) return;
-  try { const { wb, csv } = await readFile(f); useWorkbook(wb, f.name, csv); }
-  catch { notice(`Sorry, "${f.name}" could not be opened. Please use an .xlsx, .xls or .csv file.`); }
-}
-
-function run(scroll) {
-  const o = { trim: $('#oTrim').checked, empty: $('#oEmpty').checked, dupes: $('#oDupes').checked,
-    dates: $('#oDates').checked, dayFirst: segValue($('#dayOrder')) === 'day', numbers: $('#oNumbers').checked };
-  try { state.res = clean(sheetToGrid(state.wb.Sheets[$('#sheet').value]), o, state.csv); }
-  catch (e) { notice(e.message); return; }
-  render(state.res);
-  if (scroll) $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function render(r) {
-  const c = r.counts;
-  const removed = [c.dupes && plural(c.dupes, 'duplicate row'), c.empty && plural(c.empty, 'empty row')].filter(Boolean);
-  const did = [];
-  if (removed.length) did.push('removed ' + removed.join(' and '));
-  if (c.cells) did.push('fixed ' + plural(c.cells, 'cell'));
-  const said = did.join(removed.length > 1 ? ', and ' : ' and ');
-  $('#summary').innerHTML = `${plural(r.before, 'row')} went in, <b>${r.rows.length}</b> came out. `
-    + (said ? said[0].toUpperCase() + said.slice(1) + '.' : 'Nothing needed fixing.');
-
-  const head = `<thead><tr>${r.headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>`;
-  const body = r.rows.slice(0, PREVIEW_ROWS).map((row, i) => `<tr>${row.map((v, ci) => {
-    const was = r.marks[i][ci], cls = [was !== undefined ? 'changed' : '', typeof v === 'number' ? 'num' : ''].join(' ').trim();
-    return `<td${cls ? ` class="${cls}"` : ''}${was !== undefined ? ` title="Was: ${esc(was)}"` : ''}>${esc(show(v))}</td>`;
-  }).join('')}</tr>`).join('');
-  $('#preview').innerHTML = `<table>${head}<tbody>${body}</tbody></table>`;
-
-  const logBody = r.log.slice(0, LOG_ROWS).map(l => `<tr><td class="num">${l.row}</td><td>${esc(l.col)}</td><td>${esc(l.type)}</td><td>${esc(l.before)}</td><td>${esc(l.after)}</td></tr>`).join('');
-  $('#log').innerHTML = r.log.length
-    ? `<table><thead><tr><th>Excel row</th><th>Column</th><th>What changed</th><th>Before</th><th>After</th></tr></thead><tbody>${logBody}</tbody></table>`
-    : '<p class="empty-msg">Nothing needed fixing. Your data was already clean.</p>';
-  document.querySelector('#tabs [data-v="log"]').textContent = `Change log (${r.log.length})`;
-  $('#legend').innerHTML = `<span class="swatch"></span>Changed cell. Hover it to see the old value.`;
-
-  const more = [];
-  if (r.rows.length > PREVIEW_ROWS) more.push(`Showing the first ${PREVIEW_ROWS} of ${r.rows.length} rows.`);
-  if (r.log.length > LOG_ROWS) more.push(`The log shows the first ${LOG_ROWS} of ${r.log.length} changes.`);
-  $('#previewNote').textContent = (more.length ? more.join(' ') + ' ' : '') + 'The download has 3 sheets: Cleaned Data, Change Log and Summary.';
-  $('#results').hidden = false;
-}
-
-function download() {
-  const r = state.res, c = r.counts, wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheetFrom([r.headers, ...r.rows]), 'Cleaned Data');
-  XLSX.utils.book_append_sheet(wb, sheetFrom([['Excel row', 'Column', 'What changed', 'Before', 'After'], ...r.log.map(l => [l.row, l.col, l.type, l.before, l.after])]), 'Change Log');
-  XLSX.utils.book_append_sheet(wb, sheetFrom([
-    ['Summary', 'Count'],
-    ['Data rows before', r.before], ['Data rows after', r.rows.length],
-    ['Duplicate rows removed', c.dupes], ['Empty rows removed', c.empty],
-    ['Cells with extra spaces fixed', c.spaces], ['Text dates turned into real dates', c.dates], ['Numbers stored as text fixed', c.numbers],
-    ['Source file', state.name], ['Cleaned on', new Date().toLocaleString('en-GB')],
-  ]), 'Summary');
-  XLSX.writeFile(wb, state.name.replace(/\.(xlsx|xls|csv)$/i, '') + '_cleaned.xlsx');
-}
-
-// A small, deliberately messy expense claims export. All names and numbers are made up.
-function sampleWorkbook() {
-  const e = ['', '', '', '', '', ''];
-  const aoa = [
-    ['Claim ID', 'Staff Name', 'Department', 'Claim Date', 'Amount', 'Phone'],
-    ['CL-1001', '  Nur Aisyah  binti Kamal', 'Finance', '03/03/2026', 'RM 1,250.00', '012-3456789'],
-    ['CL-1002', 'Tan Wei Ming', 'Operations ', '2026-03-04', '350', '016-2223344'],
-    ['CL-1003', 'Ravi Kumar', 'Sales', '5 Mar 2026', ' 89.90', '019-8765432'],
-    e,
-    ['CL-1004', 'Siti Hajar', '  Finance', '6/3/26', 'RM420.50', '011-23456789'],
-    ['CL-1005', 'Lim Mei Ling', 'Marketing', '07-03-2026', '2,100', '017-5554433'],
-    ['CL-1002', 'Tan Wei Ming ', 'Operations', '2026-03-04', '350', '016-2223344'],
-    ['CL-1006', 'Hafiz Rahman', 'Sales', 'Mar 9, 2026', '(120.00)', '013-4447788'],
-    e,
-    ['CL-1007', 'Priya Devi', 'Human  Resources', '10.03.2026', 'RM 75', '014-9990011'],
-    ['CL-1008', 'Daniel Wong', 'IT', '11 Mac 2026', '640.00', '012-7778899'],
-    ['CL-1003', 'Ravi Kumar', 'Sales', '5 Mar 2026', '89.90', '019-8765432'],
-    ['CL-1009', 'Aina Sofea', 'Finance', '12/03/2026', 'RM 1,980.00', '018-1212121'],
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Claims');
-  return wb;
-}
-
-// ---------- Wiring ----------
-const drop = $('#drop'), input = $('#file');
-$('#pick').addEventListener('click', () => input.click());
-input.addEventListener('change', () => { loadFile([...input.files]); input.value = ''; });
-['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
-['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
-drop.addEventListener('drop', e => loadFile([...e.dataTransfer.files]));
-
-segInit($('#dayOrder'), 'aria-checked');
-segInit($('#tabs'), 'aria-selected', v => { $('#preview').hidden = v !== 'preview'; $('#log').hidden = v !== 'log'; });
-$('#sample').addEventListener('click', () => { useWorkbook(sampleWorkbook(), 'sample_expense_claims.xlsx', false); run(true); });
-$('#cleanBtn').addEventListener('click', () => run(true));
-$('#download').addEventListener('click', download);
-
-if (typeof XLSX === 'undefined') notice('The spreadsheet library did not load. Check your internet connection and refresh the page.');
-else if (new URLSearchParams(location.search).has('demo')) { useWorkbook(sampleWorkbook(), 'sample_expense_claims.xlsx', false); run(false); }
-</script>
+  </footer>
 </body>
 </html>

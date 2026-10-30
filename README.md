@@ -52,11 +52,31 @@ The download has 3 sheets: Cleaned Data, Change Log and Summary.
 
 ## How it is built
 
-- One `index.html` file. No server, no database, no install.
-- [SheetJS](https://sheetjs.com/) reads and writes Excel files in the browser.
-- Plain JavaScript applies the cleaning rules in a fixed order: spaces, then dates, then numbers, then empty rows and duplicates.
+No framework, no build step and no server. Plain HTML, CSS and JavaScript modules, with [SheetJS](https://sheetjs.com/) to read and write Excel files in the browser. The cleaning rules are pure functions, kept apart from the page code.
 
-To run it on your own computer, download `index.html` and open it in Chrome or Edge. It needs internet once to load SheetJS.
+```
+index.html              page markup
+css/theme.css           design system shared by the Office Toolkit
+css/cleaner.css         styles only this tool uses
+js/page-transition.js   slide between the toolkit pages
+js/excel.js             SheetJS helpers: read, write, cell values
+js/parse.js             text to real dates and numbers
+js/clean.js             the cleaning rules
+js/sample.js            the sample data
+js/main.js              page code: upload, show, download
+```
+
+The rules run in a fixed order: spaces, then dates, then numbers, then empty rows and duplicates.
+## Run it locally
+
+The scripts are JavaScript modules, so serve the folder with any local web server instead of double-clicking `index.html`:
+
+```bash
+python -m http.server 8000
+```
+
+Then open http://localhost:8000. Internet is needed once to load the fonts and SheetJS.
+
 
 ## About
 

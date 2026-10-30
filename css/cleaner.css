@@ -1,0 +1,45 @@
+/* Excel Data Cleaner: styles only this tool uses. Shared styles live in theme.css. */
+
+.sheet-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: var(--slate);
+  font-size: 14px;
+}
+
+/* The date-order row that belongs to the "real dates" switch above it. */
+.toggle-row--sub {
+  padding-top: 8px;
+  padding-bottom: 12px;
+  cursor: default;
+}
+
+.data-table .is-changed {
+  background: var(--info);
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  background: var(--info);
+  box-shadow: rgba(0, 153, 255, 0.45) 0 0 0 1px;
+  vertical-align: -1px;
+}
+
+.empty-message {
+  margin: 0;
+  padding: 20px;
+  color: var(--slate);
+  font-size: 14px;
+}
+
+.mini-line {
+  margin-top: 10px;
+  color: var(--slate);
+  font-size: 13px;
+}
