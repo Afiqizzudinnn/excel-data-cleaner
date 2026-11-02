@@ -172,6 +172,28 @@ code {
   text-decoration: none;
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--slate);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: -0.2px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.back-link:hover {
+  color: var(--ink);
+}
 .nav {
   display: flex;
   gap: 2px;
